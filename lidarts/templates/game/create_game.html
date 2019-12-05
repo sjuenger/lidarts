@@ -22,7 +22,7 @@
                             </a>
                             <div class="dropdown-menu" aria-labelledby="gameModeDropdown">
                                 <a class="dropdown-item" href="{{ url_for('game.create') }}/x01">X01</a>
-                                <a class="dropdown-item" href="#">Cricket</a>
+                                <a class="dropdown-item" href="{{ url_for('game.create') }}/cricket">Cricket</a>
                             </div>
                         </div>
                     </div>
@@ -39,8 +39,10 @@
         <div class="col-md-4 col-sm-6">
             <div class="card">
                 <div class="card-body">
+                    {% if form.type %}
                     <p>{{ form.type.label(class="control-label") }}:
                         {{ form.type(class="form-control custom-select") }}</p>
+                    {% endif %}
 
                     <p>{{ form.opponent.label(class="col-form-label") }}:
                         {{ form.opponent(class="custom-select", onchange="computercheck(this);") }}</p>
@@ -73,17 +75,23 @@
                 </div>
             </div>
         </div>
+        {% if form.in_mode or form.out_mode %}
         <div class="col-md-4 col-sm-6 mb-sm-1">
             <div class="card">
                 <div class="card-body">
+                    {% if form.in_mode %}
                     <p>{{ form.in_mode.label(class="col-form-label") }}:
                         {{ form.in_mode(class="custom-select") }}</p>
+                    {% endif %}
 
+                    {% if form.out_mode %}
                     <p>{{ form.out_mode.label(class="col-form-label") }}:
                         {{ form.out_mode(class="custom-select") }}</p>
+                    {% endif %}
                 </div>
             </div>
         </div>
+        {% endif %}
         <div class="col-sm-6"></div>
     </div>
     <div class="row justify-content-center text-center">

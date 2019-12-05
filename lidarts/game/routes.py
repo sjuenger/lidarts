@@ -2,7 +2,7 @@ from flask import render_template, redirect, url_for, jsonify, request
 from flask_babelex import lazy_gettext, gettext
 from lidarts.game import bp
 from lidarts.game.forms import CreateX01GameForm, CreateCricketGameForm, ScoreForm, GameChatmessageForm
-from lidarts.models import Game, User, Notification, ChatmessageIngame
+from lidarts.models import Game, CricketGame, User, Notification, ChatmessageIngame
 from lidarts import db
 from lidarts.socket.utils import broadcast_game_aborted, broadcast_new_game, send_notification
 from lidarts.game.utils import get_name_by_id, collect_statistics
@@ -17,10 +17,7 @@ import json
 @bp.route('/create/<mode>/<opponent_name>', methods=['GET', 'POST'])
 @login_required
 def create(mode='x01', opponent_name=None):
-    if mode == 'x01':
-        form = CreateX01GameForm(opponent_name=opponent_name)
-    else:
-        form = CreateCricketGameForm(opponent_name=opponent_name)
+    form = CreateX01GameForm(opponent_name=opponent_name) if mode == 'x01' else CreateCricketGameForm(opponent_name=opponent_name)
     if form.validate_on_submit():
         player1 = current_user.id if current_user.is_authenticated else None
         if player1 and form.opponent.data == 'local':
@@ -41,16 +38,29 @@ def create(mode='x01', opponent_name=None):
             # computer as opponent
             player2 = None
             status = 'started'
-        match_json = json.dumps({1: {1: {1: {'scores': [], 'double_missed': []},
-                                         2: {'scores': [], 'double_missed': []}}}})
-        game = Game(player1=player1, player2=player2, type=form.type.data,
-                    bo_sets=form.bo_sets.data, bo_legs=form.bo_legs.data,
-                    two_clear_legs=form.two_clear_legs.data,
-                    p1_sets=0, p2_sets=0, p1_legs=0, p2_legs=0,
-                    p1_score=int(form.type.data), p2_score=int(form.type.data),
-                    in_mode=form.in_mode.data, out_mode=form.out_mode.data,
-                    begin=datetime.utcnow(), match_json=match_json,
-                    status=status, opponent_type=form.opponent.data)
+        if type(form) == CreateX01GameForm:
+            match_json = json.dumps({1: {1: {1: {'scores': [], 'double_missed': []},
+                                             2: {'scores': [], 'double_missed': []}}}})
+            game = Game(player1=player1, player2=player2, type=form.type.data,
+                        bo_sets=form.bo_sets.data, bo_legs=form.bo_legs.data,
+                        two_clear_legs=form.two_clear_legs.data,
+                        p1_sets=0, p2_sets=0, p1_legs=0, p2_legs=0,
+                        p1_score=int(form.type.data), p2_score=int(form.type.data),
+                        in_mode=form.in_mode.data, out_mode=form.out_mode.data,
+                        begin=datetime.utcnow(), match_json=match_json,
+                        status=status, opponent_type=form.opponent.data)
+        else:
+            # ToDo: match_json for cricket
+            match_json = json.dumps({1: {1: {1: {'scores': [], 'double_missed': []},
+                                             2: {'scores': [], 'double_missed': []}}}})
+            game = CricketGame(
+                player1=player1, player2=player2, type=form.type.data,
+                bo_sets=form.bo_sets.data, bo_legs=form.bo_legs.data,
+                two_clear_legs=form.two_clear_legs.data,
+                p1_sets=0, p2_sets=0, p1_legs=0, p2_legs=0,
+                begin=datetime.utcnow(), match_json=match_json,
+                status=status, opponent_type=form.opponent.data
+            )
         if game.opponent_type.startswith('computer'):
             game.opponent_type += form.level.data
         game.p1_next_turn = form.starter.data == 'me'
@@ -64,8 +74,8 @@ def create(mode='x01', opponent_name=None):
         game.set_hashid()
         db.session.commit()
         return redirect(url_for('game.start', hashid=game.hashid))
-    return render_template('game/create_game.html', form=form, opponent_name=opponent_name,
-                           title=lazy_gettext('Create Game'))
+    return render_template('game/create_game.html', form=form,
+                           opponent_name=opponent_name, title=lazy_gettext('Create Game'))
 
 
 @bp.route('/')
