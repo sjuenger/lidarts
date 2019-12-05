@@ -1,7 +1,7 @@
 from flask import render_template, redirect, url_for, jsonify, request
 from flask_babelex import lazy_gettext, gettext
 from lidarts.game import bp
-from lidarts.game.forms import CreateX01GameForm, ScoreForm, GameChatmessageForm
+from lidarts.game.forms import CreateX01GameForm, CreateCricketGameForm, ScoreForm, GameChatmessageForm
 from lidarts.models import Game, User, Notification, ChatmessageIngame
 from lidarts import db
 from lidarts.socket.utils import broadcast_game_aborted, broadcast_new_game, send_notification
@@ -20,7 +20,7 @@ def create(mode='x01', opponent_name=None):
     if mode == 'x01':
         form = CreateX01GameForm(opponent_name=opponent_name)
     else:
-        pass  # no other game modes yet
+        form = CreateCricketGameForm(opponent_name=opponent_name)
     if form.validate_on_submit():
         player1 = current_user.id if current_user.is_authenticated else None
         if player1 and form.opponent.data == 'local':
@@ -64,7 +64,7 @@ def create(mode='x01', opponent_name=None):
         game.set_hashid()
         db.session.commit()
         return redirect(url_for('game.start', hashid=game.hashid))
-    return render_template('game/create_X01.html', form=form, opponent_name=opponent_name,
+    return render_template('game/create_game.html', form=form, opponent_name=opponent_name,
                            title=lazy_gettext('Create Game'))
 
 
@@ -107,7 +107,7 @@ def start(hashid, theme=None):
     # for everyone if the game is completed
     if game.status in ('completed', 'aborted', 'declined'):
         statistics = collect_statistics(game, match_json)
-        return render_template('game/X01_completed.html', game=game_dict, match_json=match_json,
+        return render_template('game/X01/X01_completed.html', game=game_dict, match_json=match_json,
                                stats=statistics, title=lazy_gettext('Match overview'))
     # for running games
     else:
@@ -130,12 +130,12 @@ def start(hashid, theme=None):
                 .filter_by(id=message.author).first_or_404()[0]
 
         if theme:
-            return render_template('game/X01_stream.html', game=game_dict, form=form,
+            return render_template('game/X01/X01_stream.html', game=game_dict, form=form,
                                    match_json=match_json, caller=caller, cpu_delay=cpu_delay,
                                    title=lazy_gettext('Stream overlay'),
                                    chat_form=chat_form, chat_form_small=chat_form_small,
                                    messages=messages, user_names=user_names)
-        return render_template('game/X01.html', game=game_dict, form=form, match_json=match_json,
+        return render_template('game/X01/X01.html', game=game_dict, form=form, match_json=match_json,
                                caller=caller, cpu_delay=cpu_delay, title=lazy_gettext('Live Match'),
                                chat_form=chat_form, chat_form_small=chat_form_small,
                                messages=messages, user_names=user_names)
