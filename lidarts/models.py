@@ -2,6 +2,7 @@ from flask_security import UserMixin, RoleMixin
 from lidarts import db
 from datetime import datetime
 from sqlalchemy.ext.associationproxy import association_proxy
+from sqlalchemy.ext.declarative import declared_attr
 import secrets
 
 
@@ -80,12 +81,11 @@ class Role(db.Model, RoleMixin):
     description = db.Column(db.String(255))
 
 
-class Game(db.Model):
-    __tablename__ = 'games'
+class GameBase(db.Model):
+    __abstract__ = True
+
     id = db.Column(db.Integer, primary_key=True)
     hashid = db.Column(db.String(10), unique=True)
-    player1 = db.Column(db.Integer, db.ForeignKey('users.id'))
-    player2 = db.Column(db.Integer, db.ForeignKey('users.id'))
     bo_sets = db.Column(db.Integer, nullable=False)
     bo_legs = db.Column(db.Integer, nullable=False)
     two_clear_legs = db.Column(db.Boolean)
@@ -93,25 +93,38 @@ class Game(db.Model):
     p2_sets = db.Column(db.Integer)
     p1_legs = db.Column(db.Integer)
     p2_legs = db.Column(db.Integer)
-    p1_score = db.Column(db.Integer)
-    p2_score = db.Column(db.Integer)
     p1_next_turn = db.Column(db.Boolean)
     closest_to_bull = db.Column(db.Boolean)
     closest_to_bull_json = db.Column(db.JSON)
     status = db.Column(db.String(20))
-    type = db.Column(db.Integer)
     match_json = db.Column(db.JSON)
-    in_mode = db.Column(db.String(15))
-    out_mode = db.Column(db.String(15))
     begin = db.Column(db.DateTime)
     end = db.Column(db.DateTime)
     opponent_type = db.Column(db.String(10))
+
+    @declared_attr
+    def player1(cls):
+        return db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    @declared_attr
+    def player2(cls):
+        return db.Column(db.Integer, db.ForeignKey('users.id'))
 
     def set_hashid(self):
         self.hashid = secrets.token_urlsafe(8)[:8]
 
     def as_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
+
+class Game(GameBase):
+    __tablename__ = 'games'
+
+    p1_score = db.Column(db.Integer)
+    p2_score = db.Column(db.Integer)
+    type = db.Column(db.Integer)
+    in_mode = db.Column(db.String(15))
+    out_mode = db.Column(db.String(15))
 
 
 class Chatmessage(db.Model):
