@@ -1,7 +1,7 @@
 from flask import render_template, redirect, url_for, jsonify, request
 from flask_babelex import lazy_gettext, gettext
 from lidarts.game import bp
-from lidarts.game.forms import CreateX01GameForm, CreateCricketGameForm, ScoreForm, GameChatmessageForm
+from lidarts.game.forms import CreateX01GameForm, CreateCricketGameForm, ScoreForm, CricketScoreForm, GameChatmessageForm
 from lidarts.models import Game, CricketGame, User, Notification, ChatmessageIngame
 from lidarts import db
 from lidarts.socket.utils import broadcast_game_aborted, broadcast_new_game, send_notification
@@ -54,7 +54,7 @@ def create(mode='x01', opponent_name=None):
             match_json = json.dumps({1: {1: {1: {'scores': [], 'double_missed': []},
                                              2: {'scores': [], 'double_missed': []}}}})
             game = CricketGame(
-                player1=player1, player2=player2, type=form.type.data,
+                player1=player1, player2=player2,
                 bo_sets=form.bo_sets.data, bo_legs=form.bo_legs.data,
                 two_clear_legs=form.two_clear_legs.data,
                 p1_sets=0, p2_sets=0, p1_legs=0, p2_legs=0,
@@ -82,7 +82,9 @@ def create(mode='x01', opponent_name=None):
 @bp.route('/<hashid>')
 @bp.route('/<hashid>/<theme>')
 def start(hashid, theme=None):
-    game = Game.query.filter_by(hashid=hashid).first_or_404()
+    game = Game.query.filter_by(hashid=hashid).first()
+    if not game:
+        game = CricketGame.query.filter_by(hashid=hashid).first_or_404()
     # check if we found an opponent, logged in users only
     if game.status == 'challenged' and current_user.is_authenticated \
             and current_user.id != game.player1:
@@ -121,10 +123,8 @@ def start(hashid, theme=None):
                                stats=statistics, title=lazy_gettext('Match overview'))
     # for running games
     else:
-        form = ScoreForm()
         chat_form = GameChatmessageForm()
         chat_form_small = GameChatmessageForm()
-        caller = current_user.caller if current_user.is_authenticated else 'default'
         cpu_delay = current_user.cpu_delay if current_user.is_authenticated else 0
 
         user = current_user.id if current_user.is_authenticated else None
@@ -139,16 +139,34 @@ def start(hashid, theme=None):
             user_names[message.author] = User.query.with_entities(User.username) \
                 .filter_by(id=message.author).first_or_404()[0]
 
-        if theme:
-            return render_template('game/X01/X01_stream.html', game=game_dict, form=form,
-                                   match_json=match_json, caller=caller, cpu_delay=cpu_delay,
-                                   title=lazy_gettext('Stream overlay'),
+        if type(game) == Game:
+            form = ScoreForm()
+            caller = current_user.caller if current_user.is_authenticated else 'default'
+
+            if theme:
+                return render_template('game/X01/X01_stream.html', game=game_dict, form=form,
+                                       match_json=match_json, caller=caller, cpu_delay=cpu_delay,
+                                       title=lazy_gettext('Stream overlay'),
+                                       chat_form=chat_form, chat_form_small=chat_form_small,
+                                       messages=messages, user_names=user_names)
+            return render_template('game/X01/X01.html', game=game_dict, form=form, match_json=match_json,
+                                   caller=caller, cpu_delay=cpu_delay, title=lazy_gettext('Live Match'),
                                    chat_form=chat_form, chat_form_small=chat_form_small,
                                    messages=messages, user_names=user_names)
-        return render_template('game/X01/X01.html', game=game_dict, form=form, match_json=match_json,
-                               caller=caller, cpu_delay=cpu_delay, title=lazy_gettext('Live Match'),
-                               chat_form=chat_form, chat_form_small=chat_form_small,
-                               messages=messages, user_names=user_names)
+        elif type(game) == CricketGame:
+            form = CricketScoreForm()
+            if theme:
+                return render_template('game/cricket/cricket_stream.html', game=game_dict, form=form,
+                                       match_json=match_json, cpu_delay=cpu_delay,
+                                       title=lazy_gettext('Stream overlay'),
+                                       chat_form=chat_form, chat_form_small=chat_form_small,
+                                       messages=messages, user_names=user_names)
+            return render_template('game/cricket/cricket.html', game=game_dict, form=form, match_json=match_json,
+                                   cpu_delay=cpu_delay, title=lazy_gettext('Live Match'),
+                                   chat_form=chat_form, chat_form_small=chat_form_small,
+                                   messages=messages, user_names=user_names)
+        else:
+            raise NotImplementedError
 
 
 @bp.route('/validate_score', methods=['POST'])
