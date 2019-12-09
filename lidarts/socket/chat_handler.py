@@ -2,7 +2,7 @@ from flask import request
 from flask_socketio import emit, join_room
 from flask_login import current_user
 from lidarts import socketio, db
-from lidarts.models import User, Chatmessage, Privatemessage, Notification, Game, ChatmessageIngame
+from lidarts.models import User, Chatmessage, Privatemessage, Notification, Game, CricketGame, ChatmessageIngame
 from lidarts.socket.utils import broadcast_online_players, send_notification
 from datetime import datetime
 import bleach
@@ -38,7 +38,9 @@ def connect():
 
 @socketio.on('init', namespace='/game_chat')
 def init(message):
-    game = Game.query.filter_by(hashid=message['hashid']).first_or_404()
+    game = Game.query.filter_by(hashid=message['hashid']).first()
+    if not game:
+        game = CricketGame.query.filter_by(hashid=message['hashid']).first_or_404()
     join_room(game.hashid)
 
 
